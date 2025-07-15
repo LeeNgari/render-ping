@@ -2,23 +2,26 @@ name: Ping Render Every 10 Minutes
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Every 10 minutes (UTC time)
-  workflow_dispatch:        # Allows manual triggering
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
 
 jobs:
   ping-and-keepalive:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for pushing changes
     
     steps:
-      # Step 1: Maintain repository activity
       - name: Checkout repository
         uses: actions/checkout@v4
-        
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # Uses the default GitHub token
+
       - name: Create keep-alive file
         run: |
           mkdir -p .github
           date >> .github/keep-alive.txt
-          
+
       - name: Commit keep-alive changes
         run: |
           git config --global user.name 'GitHub Actions'
@@ -26,8 +29,7 @@ jobs:
           git add .github/keep-alive.txt
           git diff-index --quiet HEAD || git commit -m "Keep-alive commit"
           git push
-          
-      # Step 2: Ping Render server with proper error handling
+
       - name: Ping Render Server
         run: |
           echo "Pinging Render server..."
@@ -38,16 +40,3 @@ jobs:
             echo "Ping failed (Status: $response)"
             exit 1
           fi
-          
-      # Step 3: Add notification (optional)
-      - name: Notify on failure
-        if: failure()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '⚠️ Render ping failed! Check the workflow run.'
-            })
