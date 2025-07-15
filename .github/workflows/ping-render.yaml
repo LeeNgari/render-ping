@@ -2,14 +2,52 @@ name: Ping Render Every 10 Minutes
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # every 10 minutes
-  workflow_dispatch:        # allows manual run
+    - cron: '*/10 * * * *'  # Every 10 minutes (UTC time)
+  workflow_dispatch:        # Allows manual triggering
 
 jobs:
-  ping:
+  ping-and-keepalive:
     runs-on: ubuntu-latest
-
+    
     steps:
+      # Step 1: Maintain repository activity
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Create keep-alive file
+        run: |
+          mkdir -p .github
+          date >> .github/keep-alive.txt
+          
+      - name: Commit keep-alive changes
+        run: |
+          git config --global user.name 'GitHub Actions'
+          git config --global user.email 'actions@github.com'
+          git add .github/keep-alive.txt
+          git diff-index --quiet HEAD || git commit -m "Keep-alive commit"
+          git push
+          
+      # Step 2: Ping Render server with proper error handling
       - name: Ping Render Server
         run: |
-          curl -s https://taskflow-8d1s.onrender.com/api/ping
+          echo "Pinging Render server..."
+          response=$(curl -s -o /dev/null -w "%{http_code}" https://taskflow-8d1s.onrender.com/api/ping)
+          if [ "$response" -eq 200 ]; then
+            echo "Ping successful (Status: $response)"
+          else
+            echo "Ping failed (Status: $response)"
+            exit 1
+          fi
+          
+      # Step 3: Add notification (optional)
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '⚠️ Render ping failed! Check the workflow run.'
+            })
