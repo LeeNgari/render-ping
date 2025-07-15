@@ -1,0 +1,15 @@
+name: Ping Render Every 10 Minutes
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'  # every 10 minutes
+  workflow_dispatch:        # allows manual run
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping Render Server
+        run: |
+          curl -s https://taskflow-8d1s.onrender.com/api/ping
